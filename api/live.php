@@ -9,21 +9,60 @@
  * @version     0.1
  */
 class live {
-
+        /**
+         * the socket used to communicate 
+         * @var ressource
+         */
         protected	$socket         = null;
+        /**
+         * path to the livestatus unix socket 
+         * @var string 
+         */
+        protected       $socketpath     = null;
+        /**
+         * host name or ip address of the host that serve livestatus queries
+         * @var string 
+         */
         protected   	$host           = null;
+        /**
+         * TCP port of the remote host that serve livestatus queries
+         * @var int
+         */
         protected   	$port           = null;
+        /**
+         * the socket buffer read length
+         * @var int
+         */
         protected   	$buffer         = null;
+        /**
+         * the cahracter used to define newlines (livestatus use double newline character end of query definition)
+         * @var char
+         */
         protected   	$newline        = "\n";
+        /**
+         * this is the version of livestatus it is automaticaly filed by the getLivestatusVersion() method
+         * @var string
+         */
 	protected   	$livever	= null;	
+        /**
+         * default headersize (in bytes) returned after a livestatus query (always 16)
+         * @var int
+         */
         protected   	$headersize     = 16;
-	// this define query options that will be added to each query (default options)
+        /**
+         * this define query options that will be added to each query (default options)
+         * @var array
+         */
         public   	$defaults       = array(
                         	                "ColumnHeaders: on",
                         	                "ResponseHeader: fixed16",
+                                              //  "KeepAlive: on",
                         	                "OutputFormat: json"
                         	          );
-	// this is used to define which error code are used
+	/**
+         * used to make difference between pre 1.1.3 version of livestatus return code and post 1.1.3
+         * @var array
+         */
 	protected $messages = array(
 		"versions" => array(
 			"1.0.19" => "old",
@@ -85,19 +124,38 @@ class live {
 	);
 
 
+        /**
+         * json response of the query
+         * @var string
+         */
         public	$queryresponse  = null;
-	public	$responsecode = null; 
+        /**
+         * response code returned after query
+         * @var int
+         */
+	public	$responsecode = null;
+        /**
+         * response message returned after query
+         */
+
 	public  $responsemessage = null; 
 
-
-
-
-	public function __construct($host,$port,$buffer=1024)
+        /**
+         * Constructor
+         * @params   array   array of parameters
+         * @buffer   int     buffer used to read query response
+         */
+	public function __construct($params,$buffer=1024)
 	{
-                $this->host   = $host;
-                $this->port   = $port;
+            if(isset($params["socket"])){
+                $this->socketpath = $params["socket"];
                 $this->buffer = $buffer;
-		$this->getLivestatusVersion();
+            }else{
+                $this->host   = $params["host"];
+                $this->port   = $params["port"];
+                $this->buffer = $buffer;
+            }
+            $this->getLivestatusVersion();
 	}
 
         public function  __destruct() {
@@ -105,7 +163,58 @@ class live {
             $this->queryresponse = null;
         }
 
-	public function connect(){
+
+        /**
+         * execute a livestatus query and return result as json
+         * @param array query elements
+         * @return string
+         */
+        public function execQuery($query){
+            if($this->socket){
+                $this->disconnect();
+            }else{
+                if(!$this->connect()){
+                    $this->responsecode = "501";
+                    $this->responsemessage="[SOCKET] ".$this->getSocketError();
+                    return false;
+                }else{
+                    if(!$this->query($query)){
+                        $this->responsecode = "501";
+                        $this->responsemessage="[SOCKET] ".$this->getSocketError();
+                        $this->disconnect();
+                        return false;
+                    }else{
+                        if(!$this->readresponse()){
+                            $this->disconnect();
+                            return false;
+                        }else{
+                            $this->disconnect();
+                            return $this->queryresponse;
+                        }
+                    }
+                }
+            }
+        }
+
+/**
+ * PRIVATE METHODS
+ */
+
+        /**
+         * Abstract method that choose wich connection method we should use.....
+         */
+        private function connect(){
+            if(is_null($this->socketpath)){
+                return $this->connectTCP();
+            }else{
+                return $this->connectUNIX();
+            }
+	}
+        /**
+         * connect to livestatus through TCP.
+         * @return bool true if success false if fail
+         */
+        private function connectTCP(){
             $this->socket = @socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
             if( $this->socket == false){
                 $this->socket = false;
@@ -117,9 +226,28 @@ class live {
                 return false;
             }
             return true;
-	}
+        }
 
-	public function disconnect(){
+        private function connectUNIX(){
+            $this->socket = @socket_create(AF_UNIX, SOCK_STREAM, SOL_SOCKET);
+            if( $this->socket == false){
+                $this->socket = false;
+                return false;
+            }
+            $result = @socket_connect($this->socket, $this->socketpath);
+            if ($result == false){
+                $this->socket = null;
+                return false;
+            }
+            return true;
+        }
+
+        private function connectSSH(){
+            die("Not implemented");
+        }
+
+
+	private function disconnect(){
             if ( ! is_null($this->socket)){
                 // disconnect gracefully
                 socket_shutdown($this->socket,2);
@@ -132,7 +260,21 @@ class live {
 
 	}
 
-	public function query($elements,$default="json") {
+	private function getLivestatusVersion(){
+		$query = array(
+			"GET status",
+			"Columns: livestatus_version",
+		);
+                $this->execQuery($query);
+		$result = json_decode($this->queryresponse);
+
+		$this->livever = $result[1][0];
+                $this->responsecode=null;
+                $this->responsemessage=null;
+                $this->queryresponse=null;
+	}
+
+        private function query($elements,$default="json") {
             $query = $this->preparequery($elements,$default);
             foreach($query as $element){
                 if(($this->socketwrite($element.$this->newline)) == false){
@@ -147,7 +289,7 @@ class live {
 	}
 
 
-	public function readresponse(){
+	private function readresponse(){
             $this->queryresponse="";
 
             if ( ! is_null( $this->socket ) ){
@@ -157,8 +299,8 @@ class live {
 
 		$this->responsecode = $code;
 		$this->responsemessage = $this->code2message($code);
-		if($code != "200"){ 
-			return false; 
+		if($code != "200"){
+			return false;
 		}
                 $this->queryresponse = $this->socketread($size);
                 return true;
@@ -167,23 +309,6 @@ class live {
             }
         }
 
-
-/**
- * PRIVATE METHODS
- */
-
-	private function getLivestatusVersion(){
-		$query = array(
-			"GET status",
-			"Columns: livestatus_version",
-		);
-		$this->connect(); 
-		$this->query($query); 
-		$this->readresponse();
-		$this->disconnect(); 
-		$result = json_decode($this->queryresponse);
-		$this->livever = $result[1][0];
-	}
 
 	private function code2message($code){
 		if ( ! isset($this->messages["versions"][$this->livever])){
@@ -232,10 +357,7 @@ class live {
         public function getSocketError(){
             $errorcode = socket_last_error();
             $errormsg = socket_strerror($errorcode);
-            return array(
-                "code"=>$errorcode,
-                "message"=>$errormsg
-            );
+            return $errormsg;
         }
 
         private function getHeaders(){

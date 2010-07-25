@@ -5,42 +5,33 @@
 
 require("../api/live.php");
 
-$query = array("GET colmmumns");
+$query = array("GET columns");
 
-// create live object
-$live = new live("localhost", "6557");
-// connect
-if ( ! $live->connect() ){
-    	die("Unable to connect");
+// create live object TCP with xinetd with default buffer size
+// $live = new live(array("host"=>"localhost", "port"=>"6557"));
+
+// create live object Unix Socket
+$live = new live(array("socket"=>"/opt/monitor/var/rw/live"),1024);
+
+if(!$live){
+    die("Error while connecting");
 }else{
-	// query nagios/shinken data
-	if (!$live->query($query)){
-		die("Query Error");
-	}else{
-		if($live->responsecode != "200"){
-			die("QUERY : ".$live->responsemessage." (".$live->responsecode.")");
-		}else{
-			// read response after query
-			if (!$live->readresponse()){
-			    die("Response Error");
-			}else{
-				// disconnect from livestatus socket
-				$live->disconnect();
-				// use data
-				$response = json_decode($live->queryresponse);
-				echo "<table>";
-				foreach ($response as $line){
-					// line
-					echo "<tr>";
-					// header
-					foreach($line as $col){
-						echo "<td style=\"border:1px solid black\">".$col."</td>";
-					}
-					echo "</tr>";
-				}
-				echo "</table>";
-			}
-		}
-	}
+    $json = $live->execQuery($query);
+    if($live->responsecode != "200"){
+        // error
+        die($live->responsecode." : ".$live->responsemessage);
+    }
+    $response = json_decode($json);
+    echo "<table>";
+    foreach ($response as $line){
+        // line
+        echo "<tr>";
+        // header
+        foreach($line as $col){
+            echo "<td style=\"border:1px solid black\">".$col."</td>";
+        }
+        echo "</tr>";
+    }
+    echo "</table>";
 }
 ?>
