@@ -5,17 +5,19 @@
 
 require("../api/live.php");
 
+// live status query (each line is a row in the array)
 $query = array("GET columns");
 
 // create live object TCP with xinetd with default buffer size
 // $live = new live(array("host"=>"localhost", "port"=>"6557"));
 
-// create live object Unix Socket
+// create live object with Unix Socket
 $live = new live(array("socket"=>"/opt/monitor/var/rw/live"),1024);
 
 if(!$live){
     die("Error while connecting");
 }else{
+    //execute the query
     $json = $live->execQuery($query);
     if($live->responsecode != "200"){
         // error

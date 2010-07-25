@@ -1,11 +1,11 @@
 <?php
 /**
- * base class to use live status implementation in shinken
+ * base class to use live status implementation in shinken and nagios
  *
- * @package     shinkenapi
+ * @package     livestatusapi
  * @author      David GUENAULT (dguenault@monitoring-fr.org)
  * @copyright   (c) 2010 Monitoring-fr Team / Shinken Team (http://monitoring-fr.org / http://www.shinken-monitoring.org)
- * @license     Affero GPL
+ * @license     Afero GPL
  * @version     0.1
  */
 class live {
