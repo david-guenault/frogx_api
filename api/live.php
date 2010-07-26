@@ -50,6 +50,11 @@ class live {
          */
         protected   	$headersize     = 16;
         /**
+         *
+         * @commands array list all authorized commands
+         */
+        protected       $commands = null;
+        /**
          * this define query options that will be added to each query (default options)
          * @var array
          */
@@ -137,16 +142,16 @@ class live {
         /**
          * response message returned after query
          */
-
 	public  $responsemessage = null; 
 
         /**
-         * Constructor
-         * @params   array   array of parameters
-         * @buffer   int     buffer used to read query response
+         * Class Constructor
+         * @param array params array of parameters (if socket is in the keys then the connection is UNIX SOCKET else it is TCP SOCKET)
+         * @param int buffer used to read query response
          */
 	public function __construct($params,$buffer=1024)
 	{
+            // fucking php limitation on declaring multiple constructors !
             if(isset($params["socket"])){
                 $this->socketpath = $params["socket"];
                 $this->buffer = $buffer;
@@ -158,6 +163,9 @@ class live {
             $this->getLivestatusVersion();
 	}
 
+        /**
+         * Class destructor
+         */
         public function  __destruct() {
             $this->disconnect();
             $this->queryresponse = null;
@@ -166,35 +174,59 @@ class live {
 
         /**
          * execute a livestatus query and return result as json
-         * @param array query elements
-         * @return string
+         * @param array $query elements of the querry (ex: array("GET services","Filter: state = 1","Filter: state = 2", "Or: 2"))
+         * @return string the json encoded result of the query
          */
         public function execQuery($query){
             if($this->socket){
                 $this->disconnect();
+            }
+            if(!$this->connect()){
+                $this->responsecode = "501";
+                $this->responsemessage="[SOCKET] ".$this->getSocketError();
+                return false;
             }else{
-                if(!$this->connect()){
+                if(!$this->query($query)){
                     $this->responsecode = "501";
                     $this->responsemessage="[SOCKET] ".$this->getSocketError();
+                    $this->disconnect();
                     return false;
                 }else{
-                    if(!$this->query($query)){
-                        $this->responsecode = "501";
-                        $this->responsemessage="[SOCKET] ".$this->getSocketError();
+                    if(!$this->readresponse()){
                         $this->disconnect();
                         return false;
                     }else{
-                        if(!$this->readresponse()){
-                            $this->disconnect();
-                            return false;
-                        }else{
-                            $this->disconnect();
-                            return $this->queryresponse;
-                        }
+                        $this->disconnect();
+                        return $this->queryresponse;
                     }
                 }
             }
         }
+
+        /**
+         * This method submit an external command to nagios through livestatus socket.
+         * @param array $command an array describing the command array("COMMANDNAME",array("paramname"=>"value","paramname"=>"value",...)
+         * @return bool true if success false il failed
+         */
+        public function sendExternalCommand($command){
+            if(!$this->parseCommand($command)){
+                return false;
+            }else{
+                if(!$this->submitExternalCommand($command)){
+                    return false;
+                }else{
+                    return true;
+                }
+            }
+        }
+
+        /**
+         * load commands defined in commands.inc.php
+         */
+        public function getCommands($commands){
+            $this->commands = $commands;
+        }
+
 
 /**
  * PRIVATE METHODS
@@ -375,5 +407,79 @@ class live {
         private function preparequery($elements){
             $query=$this->defaults;
             return array_merge((array)$elements,(array)$query);
+        }
+
+
+        /**
+         * This function submit an external command to the livestatus enabled host
+         * @param array $command an array defining the command array("commandname",array("argname"=>"value","argname"=>"value",...))
+         * @return bool true if success, false if failed
+         */
+        private function submitExternalCommand($command){
+            $arguments = "";
+            foreach(array_keys($command[1]) as $key){
+                
+                $arguments .= $command[1][$key].";";
+            }
+            $arguments = substr($arguments, 0, strlen($arguments)-1);
+            $commandline = "COMMAND [".time()."] ".$command[0].";".$arguments;
+            if($this->socket){
+                $this->disconnect();
+            }
+            if(!$this->connect()){
+                $this->responsecode = "501";
+                $this->responsemessage="[SOCKET] ".$this->getSocketError();
+                return false;
+            }else{
+                if(!$this->query($commandline)){
+                    $this->responsecode = "501";
+                    $this->responsemessage="[SOCKET] ".$this->getSocketError();
+                    $this->disconnect();
+                    return false;
+                }else{
+                    $this->responsecode = null;
+                    $this->responsemessage = null;
+                    return true;
+                }
+            }
+        } 
+        /**
+         * This function is used to parse and validate commands before submit them.
+         * @param array $command an array defining the command array("commandname",array("argname"=>"value","argname"=>"value",...))
+         * @return bool true id ok false if not. the raison is stored in responsecode and response message class properties.
+         */
+        private function parseCommand($command){
+
+            // check if there is 2 elements in the array
+            if(count($command) != 2){
+                $this->responsecode = "602";
+                $this->responsemessage = "Invalid message definition (wrong number of entries in \$command)";
+            }else{
+                // check if first element exist as a key in commands definition
+                if(!array_key_exists($command[0], $this->commands)){
+                    $this->responsecode = "602";
+                    $this->responsemessage = "Invalid message definition (command ".$command[0]." not found)";
+                }else{
+                    // check number of arguments against command definition
+                    if(count($this->commands[$command[0]]) != count($command[1])){
+                        $this->responsecode = "602";
+                        $this->responsemessage = "Invalid number of arguments (required : ".count($this->commands[$command[0]]).", provided : ".count($command[1]).")";
+                    }else{
+                        // check argument's names
+                        $defined_keys = $this->commands[$command[0]];
+                        $provided_keys = array_keys($command[1]);
+                        $diff_keys = array_diff($defined_keys, $provided_keys);
+                        if ( count($diff_keys) > 0 ){
+                            $this->responsecode = "602";
+                            $this->responsemessage = "The arguments provided doesn't match the required arguments (".implode(", ", $diff_keys).")";
+                        }else{
+                            $this->responsecode = null;
+                            $this->responsemessage = null;
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
         }
 }
