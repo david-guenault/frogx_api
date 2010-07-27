@@ -8,6 +8,6 @@ require_once("/var/www/frogx/api/live.php");
 require_once("/var/www/frogx/api/tac.php");
 
 $tac = new tac(array("host"=>"localhost", "port"=>"6557"));
-print_r(json_decode($tac->getOverallStates($config["sites"])));
+print($tac->getOverallStates($config["sites"]));
 
 ?>
