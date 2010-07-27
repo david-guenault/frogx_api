@@ -3,7 +3,7 @@
 // this script execute a simple livestatus query on table columns
 // columns describe all of the others tables of livestatus
 
-require("../api/live.php");
+require_once("/var/www/frogx/api/live.php");
 
 // live status query (each line is a row in the array)
 $query = array("GET columns");

@@ -291,8 +291,10 @@ class live {
             }
 
 	}
-
-	private function getLivestatusVersion(){
+	/**
+	 * get livestatus version and put it in livever class property
+	 */
+	protected function getLivestatusVersion(){
 		$query = array(
 			"GET status",
 			"Columns: livestatus_version",

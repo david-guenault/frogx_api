@@ -8,9 +8,11 @@
  * @license     Afero GPL
  * @version     0.1
  */
-require_once './live.php';
 
 class tac extends live{
+    
+    public $sites = null;
+    
     /**
      * Class Constructor
      * @param array params array of parameters (if socket is in the keys then the connection is UNIX SOCKET else it is TCP SOCKET)
@@ -39,9 +41,112 @@ class tac extends live{
      * @param array $sites
      * @return string   the json encoded tac values
      */
-    public function getTac($sites=null){
+    public function getOverallStates($sites){
+        // check sites validity
+        if($sites == null || count($sites) < 1){
+            $this->responsecode = "603";
+            $this->responsemessage = "[SITES] invalid sites definition";
+            return false;
+        }
+    
+        // get overall services states (HARD STATES ONLY)
+        $queryservices = array(
+            "GET services",
+            "Columns: state",
+            "Filter: state_type = 1"
+        );
         
-        return true;
+        // get overall hosts states (HARD STATES ONLY)
+        $queryhosts = array(
+            "GET hosts",
+            "Columns: state",
+            "Filter: state_type = 1"
+        );
+        
+        $failedservices = array();
+        $failedhosts = array();
+        
+        $hosts=array(
+            "UP"=>0,
+            "DOWN"=>0,
+            "UNREACHABLE"=>0,
+            "ALL PROBLEMS"=>0,
+            "ALL TYPES"=>0
+        );        
+        
+        $services=array(
+            "OK"=>0,
+            "WARNING"=>0,
+            "CRITICAL"=>0,
+            "UNKNOWN"=>0,
+            "ALL PROBLEMS"=>0,
+            "ALL TYPES"=>0
+        );        
+        
+        foreach($sites as $site){
+            if(!$this->execQuery($queryservices)){
+                // one ore more sites failed to execute the query
+                // we keep a trace
+                $failedservices[$site]=array("code"=>$this->responsecode,"message"=>$this->responsemessage);
+            }else{
+                $result=json_decode($this->queryresponse);
+                foreach($result as $state){
+                    switch($state[0]){
+                        case "0":
+                            $services["OK"]++;
+                            $services["ALL TYPES"]++;
+                            break;
+                        case "1":
+                            $services["WARNING"]++;
+                            $services["ALL PROBLEMS"]++;
+                            $services["ALL TYPES"]++;
+                            break;
+                        case "2":
+                            $services["CRITICAL"]++;
+                            $services["ALL PROBLEMS"]++;
+                            $services["ALL TYPES"]++;
+                            break;
+                        case "3":
+                            $services["UNKNOWN"]++;
+                            $services["ALL PROBLEMS"]++;
+                            $services["ALL TYPES"]++;
+                            break;
+                    }
+                }
+            }
+            if(!$this->execQuery($queryhosts)){
+                // one ore more sites failed to execute the query
+                // we keep a trace
+                $failedhosts[$site]=array("code"=>$this->responsecode,"message"=>$this->responsemessage);
+            }else{
+                $result=json_decode($this->queryresponse);
+                foreach($result as $state){
+                    switch($state[0]){
+                        case "0":
+                            $hosts["UP"]++;
+                            $hosts["ALL TYPES"]++;
+                            break;
+                        case "1":
+                            $hosts["DOWN"]++;
+                            $hosts["ALL PROBLEMS"]++;
+                            $hosts["ALL TYPES"]++;
+                            break;
+                        case "2":
+                            $hosts["UNREACHABLE"]++;
+                            $hosts["ALL PROBLEMS"]++;
+                            $hosts["ALL TYPES"]++;
+                            break;
+                    }
+                }
+
+            }
+        }
+        return array(
+            "hosts"=>$hosts,
+            "services"=>$services
+        );
     }
+
+
 
 }
