@@ -141,10 +141,10 @@ class tac extends live{
 
             }
         }
-        return array(
+        return json_encode(array(
             "hosts"=>$hosts,
             "services"=>$services
-        );
+        ));
     }
 
 
