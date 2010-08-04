@@ -4,19 +4,21 @@
 $base = "/var/www/frogx";
 include_once ($base."/api/live.php");
 include_once ($base."/conf/commands.inc.php");
-// live status query (each line is a row in the array)
+
+// command definition 
 $command = array(
     "DISABLE_HOST_SVC_CHECKS",
     array("host_name"=>"localhost")
 );
 
-// create live object TCP with xinetd with default buffer size
-// $live = new live(array("host"=>"localhost", "port"=>"6557"));
+// this is a single site command call
 
 // create live object with Unix Socket
 $live = new live(array("socket"=>"/opt/monitor/var/rw/live"),1024);
+
 //load authorised external command list
 $live->getCommands($config["commands"]);
+
 if(!$live){
     die("Error while connecting");
 }else{
@@ -27,4 +29,7 @@ if(!$live){
         echo "[SUCCESS]";
     }
 }
+
+// 
+
 ?>
