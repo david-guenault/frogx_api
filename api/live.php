@@ -13,156 +13,169 @@ class live {
          * the socket used to communicate 
          * @var ressource
          */
-        protected	$socket         = null;
+        	protected	$socket         = null;
         /**
          * path to the livestatus unix socket 
          * @var string 
          */
-        protected       $socketpath     = null;
+        	protected       $socketpath     = null;
         /**
          * host name or ip address of the host that serve livestatus queries
          * @var string 
          */
-        protected   	$host           = null;
+        	protected   	$host           = null;
         /**
          * TCP port of the remote host that serve livestatus queries
          * @var int
          */
-        protected   	$port           = null;
+        	protected   	$port           = null;
         /**
          * the socket buffer read length
          * @var int
          */
-        protected   	$buffer         = null;
+        	protected   	$buffer         = 1024;
         /**
          * the cahracter used to define newlines (livestatus use double newline character end of query definition)
          * @var char
          */
-        protected   	$newline        = "\n";
+        	protected   	$newline        = "\n";
         /**
          * this is the version of livestatus it is automaticaly filed by the getLivestatusVersion() method
          * @var string
          */
-	protected   	$livever	= null;	
+			protected   	$livever	= null;	
         /**
          * default headersize (in bytes) returned after a livestatus query (always 16)
          * @var int
          */
-        protected   	$headersize     = 16;
+        	protected   	$headersize     = 16;
         /**
          *
          * @commands array list all authorized commands
          */
-        protected       $commands = null;
+        	protected       $commands = null;
         /**
          * this define query options that will be added to each query (default options)
          * @var array
          */
-        public   	$defaults       = array(
-                        	                "ColumnHeaders: on",
-                        	                "ResponseHeader: fixed16",
-                                              //  "KeepAlive: on",
-                        	                "OutputFormat: json"
-                        	          );
-	/**
-         * used to make difference between pre 1.1.3 version of livestatus return code and post 1.1.3
-         * @var array
-         */
-	protected $messages = array(
-		"versions" => array(
-			"1.0.19" => "old",
-			"1.0.20" => "old",
-			"1.0.21" => "old",
-			"1.0.22" => "old",
-			"1.0.23" => "old",
-			"1.0.24" => "old",
-			"1.0.25" => "old",
-			"1.0.26" => "old",
-			"1.0.27" => "old",
-			"1.0.28" => "old",
-			"1.0.29" => "old",
-			"1.0.30" => "old",
-			"1.0.31" => "old",
-			"1.0.32" => "old",
-			"1.0.33" => "old",
-			"1.0.34" => "old",
-			"1.0.35" => "old",
-			"1.0.36" => "old",
-			"1.0.37" => "old",
-			"1.0.38" => "old",
-			"1.0.39" => "old",
-			"1.1.0" => "old",
-			"1.1.1" => "old",
-			"1.1.2" => "old",
-			"1.1.3" => "new",
-			"1.1.4" => "new",
-			"1.1.5i0" => "new",
-			"1.1.5i1" => "new",
-			"1.1.5i2" => "new",
-			"1.1.5i3" => "new",
-			"1.1.6b2" => "new",
-			"1.1.6b3" => "new",
-			"1.1.6rc1" => "new",
-			"1.1.6rc2" => "new",
-			"1.1.6rc3" => "new",
-			"1.1.6p1" => "new",
-			"1.1.7i1" => "new",
-			"1.1.7i2" => "new"
-		),
-		"old" => array(
-			"200"=>"OK. Reponse contains the queried data.",
-			"401"=>"The request contains an invalid header.",
-			"402"=>"The request is completely invalid.",
-			"403"=>"The request is incomplete",
-			"404"=>"The target of the GET has not been found (e.g. the table).",
-			"405"=>"A non-existing column was being referred to"
-		),
-		"new" => array(
-			"200"=>"OK. Reponse contains the queried data.",
-			"400"=>"The request contains an invalid header.",
-			"403"=>"The user is not authorized (see AuthHeader)",
-			"404"=>"The target of the GET has not been found (e.g. the table).",
-			"450"=>"A non-existing column was being referred to",
-			"451"=>"The request is incomplete.",
-			"452"=>"The request is completely invalid."
-		)
-	);
+        	public   	$defaults       = array(
+											"ColumnHeaders: on",
+                        	               	"ResponseHeader: fixed16",
+                                          	//  "KeepAlive: on",
+                        	               	"OutputFormat: json"
+                        	          	);
+			/**
+          * used to make difference between pre 1.1.3 version of livestatus return code and post 1.1.3
+          * @var array
+          */
+			protected $messages = array(
+				"versions" => array(
+					"1.0.19" => "old",
+					"1.0.20" => "old",
+					"1.0.21" => "old",
+					"1.0.22" => "old",
+					"1.0.23" => "old",
+					"1.0.24" => "old",
+					"1.0.25" => "old",
+					"1.0.26" => "old",
+					"1.0.27" => "old",
+					"1.0.28" => "old",
+					"1.0.29" => "old",
+					"1.0.30" => "old",
+					"1.0.31" => "old",
+					"1.0.32" => "old",
+					"1.0.33" => "old",
+					"1.0.34" => "old",
+					"1.0.35" => "old",
+					"1.0.36" => "old",
+					"1.0.37" => "old",
+					"1.0.38" => "old",
+					"1.0.39" => "old",
+					"1.1.0" => "old",
+					"1.1.1" => "old",
+					"1.1.2" => "old",
+					"1.1.3" => "new",
+					"1.1.4" => "new",
+					"1.1.5i0" => "new",
+					"1.1.5i1" => "new",
+					"1.1.5i2" => "new",
+					"1.1.5i3" => "new",
+					"1.1.6b2" => "new",
+					"1.1.6b3" => "new",
+					"1.1.6rc1" => "new",
+					"1.1.6rc2" => "new",
+					"1.1.6rc3" => "new",
+					"1.1.6p1" => "new",
+					"1.1.7i1" => "new",
+					"1.1.7i2" => "new"
+				),
+				"old" => array(
+					"200"=>"OK. Reponse contains the queried data.",
+					"401"=>"The request contains an invalid header.",
+					"402"=>"The request is completely invalid.",
+					"403"=>"The request is incomplete",
+					"404"=>"The target of the GET has not been found (e.g. the table).",
+					"405"=>"A non-existing column was being referred to"
+				),
+				"new" => array(
+					"200"=>"OK. Reponse contains the queried data.",
+					"400"=>"The request contains an invalid header.",
+					"403"=>"The user is not authorized (see AuthHeader)",
+					"404"=>"The target of the GET has not been found (e.g. the table).",
+					"450"=>"A non-existing column was being referred to",
+					"451"=>"The request is incomplete.",
+					"452"=>"The request is completely invalid."
+				)
+			);
 
 
         /**
          * json response of the query
          * @var string
          */
-        public	$queryresponse  = null;
+        	public	$queryresponse  = null;
         /**
          * response code returned after query
          * @var int
          */
-	public	$responsecode = null;
+			public	$responsecode = null;
         /**
          * response message returned after query
          */
-	public  $responsemessage = null; 
+			public  $responsemessage = null; 
 
         /**
          * Class Constructor
          * @param array params array of parameters (if socket is in the keys then the connection is UNIX SOCKET else it is TCP SOCKET)
          * @param int buffer used to read query response
          */
-	public function __construct($params,$buffer=1024)
-	{
-            // fucking php limitation on declaring multiple constructors !
-            if(isset($params["socket"])){
-                $this->socketpath = $params["socket"];
-                $this->buffer = $buffer;
-            }else{
-                $this->host   = $params["host"];
-                $this->port   = $params["port"];
-                $this->buffer = $buffer;
-            }
-            $this->getLivestatusVersion();
-	}
-
+			public function __construct($params,$buffer=1024){
+	            // fucking php limitation on declaring multiple constructors !
+	            if(isset($params["socket"])){
+	                $this->socketpath = $params["socket"];
+	                $this->buffer = $buffer;
+	                $this->getLivestatusVersion();
+	            }elseif(isset($params["host"]) && isset($params["port"]) ){
+	                $this->host   = $params["host"];
+	                $this->port   = $params["port"];
+	                $this->buffer = $buffer;
+	                $this->getLivestatusVersion();
+	            }else{
+					return false;
+	            }
+	            
+			}
+			
+			/**
+			 * wrapper constructor method
+			 * Enter description here ...
+			 * @param $params
+			 * @param $buffer
+			 */
+			protected function constructLive($params,$buffer=1024){
+				$this->__construct($params,$buffer);
+			}
+			
         /**
          * Class destructor
          */
@@ -235,7 +248,7 @@ class live {
         /**
          * Abstract method that choose wich connection method we should use.....
          */
-        private function connect(){
+        protected function connect(){
             if(is_null($this->socketpath)){
                 return $this->connectTCP();
             }else{
@@ -324,24 +337,22 @@ class live {
 
 
 	private function readresponse(){
-            $this->queryresponse="";
-
-            if ( ! is_null( $this->socket ) ){
-                $headers = $this->getHeaders();
-                $code = $headers["statuscode"];
-                $size = $headers["contentlength"];
-
-		$this->responsecode = $code;
-		$this->responsemessage = $this->code2message($code);
-		if($code != "200"){
-			return false;
+		$this->queryresponse="";
+		if ( ! is_null( $this->socket ) ){
+        	$headers = $this->getHeaders();
+            $code = $headers["statuscode"];
+            $size = $headers["contentlength"];
+			$this->responsecode = $code;
+			$this->responsemessage = $this->code2message($code);
+			if($code != "200"){
+				return false;
+			}
+            $this->queryresponse = $this->socketread($size);
+            return true;
+		}else{
+        	return false;
 		}
-                $this->queryresponse = $this->socketread($size);
-                return true;
-            }else{
-                return false;
-            }
-        }
+	}
 
 
 	private function code2message($code){

@@ -7,7 +7,7 @@ require_once("/var/www/frogx/conf/sites.inc.php");
 require_once("/var/www/frogx/api/live.php");
 require_once("/var/www/frogx/api/tac.php");
 
-$tac = new tac(array("host"=>"localhost", "port"=>"6557"));
+$tac = new tac();
 print($tac->getOverallStates($config["sites"]));
 
 ?>

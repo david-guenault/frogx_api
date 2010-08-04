@@ -6,11 +6,17 @@
  * @name $config
  */
 $config["sites"]=array(
-    "frogx"=>array(
-        "type"=>"TCP",
-        "address"=>"localhost",
-        "port"=>"5667"
+    "host-unix"=>array(
+        "type"=>"UNIX",
+        "socket"=>"/opt/monitor/var/rw/live"
     )
+//    ,
+//    "host-tcp"=>array(
+//        "type"=>"TCP",
+//        "host"=>"localhost",
+//        "port"=>"6557"
+//    )  
+//      
 );
 
 ?>

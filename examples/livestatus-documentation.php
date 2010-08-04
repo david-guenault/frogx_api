@@ -9,10 +9,10 @@ require_once("/var/www/frogx/api/live.php");
 $query = array("GET columns");
 
 // create live object TCP with xinetd with default buffer size
-// $live = new live(array("host"=>"localhost", "port"=>"6557"));
+$live = new live(array("host"=>"localhost", "port"=>"6557"));
 
 // create live object with Unix Socket
-$live = new live(array("socket"=>"/opt/monitor/var/rw/live"),1024);
+//$live = new live(array("socket"=>"/opt/monitor/var/rw/live"),1024);
 
 if(!$live){
     die("Error while connecting");

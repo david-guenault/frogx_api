@@ -12,33 +12,18 @@
 class tac extends live{
     
     public $sites = null;
+
+    public function __construct(){
+    	
+    }
+    
+    public function __destruct(){
+    	
+    }
     
     /**
-     * Class Constructor
-     * @param array params array of parameters (if socket is in the keys then the connection is UNIX SOCKET else it is TCP SOCKET)
-     * @param int buffer used to read query response
-     */
-    public function __construct($params,$buffer=1024) {
-            // fucking php limitation on declaring multiple constructors !
-            if(isset($params["socket"])){
-                $this->socketpath = $params["socket"];
-                $this->buffer = $buffer;
-            }else{
-                $this->host   = $params["host"];
-                $this->port   = $params["port"];
-                $this->buffer = $buffer;
-            }
-            $this->getLivestatusVersion();
-    }
-    /**
-     * Class destructor
-     */
-    public function __destruc(){
-        
-    }
-    /**
      * This method get the overall status of all services and hosts. if $sites is an array of sites names it will only retrieve the tac for the specified sites.
-     * @param array $sites
+     * @param array sites an array off all of the monitoring hosts (see conf/sites.inc.php)
      * @return string   the json encoded tac values
      */
     public function getOverallStates($sites){
@@ -51,16 +36,19 @@ class tac extends live{
     
         // get overall services states (HARD STATES ONLY)
         $queryservices = array(
-            "GET services",
-            "Columns: state",
-            "Filter: state_type = 1"
+			"GET services",
+			"Stats: state = 0",
+			"Stats: state = 1",
+			"Stats: state = 2",
+			"Stats: state = 3",  
         );
         
         // get overall hosts states (HARD STATES ONLY)
         $queryhosts = array(
-            "GET hosts",
-            "Columns: state",
-            "Filter: state_type = 1"
+			"GET hosts",
+			"Stats: state = 0",
+			"Stats: state = 1",
+			"Stats: state = 2"
         );
         
         $failedservices = array();
@@ -84,69 +72,71 @@ class tac extends live{
         );        
         
         foreach($sites as $site){
-            if(!$this->execQuery($queryservices)){
-                // one ore more sites failed to execute the query
-                // we keep a trace
-                $failedservices[$site]=array("code"=>$this->responsecode,"message"=>$this->responsemessage);
-            }else{
-                $result=json_decode($this->queryresponse);
-                foreach($result as $state){
-                    switch($state[0]){
-                        case "0":
-                            $services["OK"]++;
-                            $services["ALL TYPES"]++;
-                            break;
-                        case "1":
-                            $services["WARNING"]++;
-                            $services["ALL PROBLEMS"]++;
-                            $services["ALL TYPES"]++;
-                            break;
-                        case "2":
-                            $services["CRITICAL"]++;
-                            $services["ALL PROBLEMS"]++;
-                            $services["ALL TYPES"]++;
-                            break;
-                        case "3":
-                            $services["UNKNOWN"]++;
-                            $services["ALL PROBLEMS"]++;
-                            $services["ALL TYPES"]++;
-                            break;
-                    }
-                }
-            }
-            if(!$this->execQuery($queryhosts)){
-                // one ore more sites failed to execute the query
-                // we keep a trace
-                $failedhosts[$site]=array("code"=>$this->responsecode,"message"=>$this->responsemessage);
-            }else{
-                $result=json_decode($this->queryresponse);
-                foreach($result as $state){
-                    switch($state[0]){
-                        case "0":
-                            $hosts["UP"]++;
-                            $hosts["ALL TYPES"]++;
-                            break;
-                        case "1":
-                            $hosts["DOWN"]++;
-                            $hosts["ALL PROBLEMS"]++;
-                            $hosts["ALL TYPES"]++;
-                            break;
-                        case "2":
-                            $hosts["UNREACHABLE"]++;
-                            $hosts["ALL PROBLEMS"]++;
-                            $hosts["ALL TYPES"]++;
-                            break;
-                    }
-                }
-
-            }
+        	if($this->connectSite($site)){
+        		$result=$this->execQuery($queryservices);
+	            if($result == false){
+	                // one ore more sites failed to execute the query
+	                // we keep a trace
+	                $failedservices[]=array("site"=>$site,"code"=>$this->responsecode,"message"=>$this->responsemessage);
+	                return false;
+	            }else{
+	                $states=json_decode($this->queryresponse);
+	                // OK
+	                $services["OK"] += $states[0][0];
+	                // WARNING
+	                $services["WARNING"] += $states[0][1];
+	                // CRITICAL
+	                $services["CRITICAL"] += $states[0][2];
+	                // UNKNOWN
+	                $services["UNKNOWN"] += $states[0][3];
+	                // ALL TYPES
+	                $services["ALL TYPES"] += $services["OK"]+$services["WARNING"]+$services["CRITICAL"]+$services["UNKNOWN"];
+	                // ALL PROBLEMS
+	                $services["ALL PROBLEMS"] += $services["WARNING"]+$services["CRITICAL"]+$services["UNKNOWN"];
+	            }
+	            $result=$this->execQuery($queryhosts);
+	            if(!$result){
+	                // one ore more sites failed to execute the query
+	                // we keep a trace
+	                $failedhosts[]=array("site"=>$site,"code"=>$this->responsecode,"message"=>$this->responsemessage);
+	            }else{
+	                $states=json_decode($this->queryresponse);
+	                // UP
+	                $hosts["UP"] += $states[0][0];
+	                // DOWN
+	                $hosts["DOWN"] += $states[0][1];
+	                // UNREACHABLE
+                	$hosts["UNREACHABLE"] += $states[0][2];
+	                // ALL TYPES
+	                $hosts["ALL TYPES"] += $hosts["UP"]+$hosts["DOWN"]+$hosts["UNREACHABLE"];
+	                // ALL PROBLEMS
+	                $hosts["ALL PROBLEMS"] += $hosts["DOWN"]+$hosts["UNREACHABLE"];
+	            }
+        	}else{
+	            // one ore more sites failed to connect 
+	            // we keep a trace
+	            $failedhosts[]=array("site"=>$site,"code"=>$this->responsecode,"message"=>$this->responsemessage);
+        	}
         }
-        return json_encode(array(
-            "hosts"=>$hosts,
-            "services"=>$services
-        ));
+		return json_encode(array(
+			"hosts"=>$hosts,
+		    "services"=>$services
+		)); 	            
     }
 
-
+	private function connectSite($site){
+		switch($site["type"]){
+			case "TCP":
+				$this->host = $site["host"];
+				$this->port = $site["port"];
+				break;
+			case "UNIX":
+				$this->socketpath = $site["socket"];
+				break;
+			default:
+				break;
+		}
+		return $this->connect();
+	}
 
 }
