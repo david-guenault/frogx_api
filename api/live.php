@@ -245,6 +245,7 @@ class live {
 			"Stats: last_hard_state = 3",  
         );
         
+        // pending services
         $querypendingservices = array(
 			"GET services",
         	"Stats: last_check = 0",
@@ -259,6 +260,7 @@ class live {
 			"Stats: last_hard_state = 2"
         );
 
+        // pending services
         $querypendinghosts = array(
 			"GET hosts",
         	"Stats: last_check = 0",
@@ -376,8 +378,215 @@ class live {
      * 
      * Enter description here ...
      */
-    public function getPerformances($sites){
+    public function getPerformances($sites=null){
+    	if(!is_null($sites)){
+    		$this->sites = $sites;
+    	}
+
+        $ts = strtotime("now");
+        $ts1min = strtotime("-1 minute");
+        $ts5min = strtotime("-5 minute");
+		$ts15min = strtotime("-15 minute");
+        $ts1hour = strtotime("-1 hour");    	
     	
+        // get active services stats
+        $queryactiveservicestats = array(
+			"GET services",
+        	"Stats: min latency",
+        	"Stats: max latency",
+        	"Stats: avg latency",
+        	"Stats: min execution_time",
+        	"Stats: max execution_time",
+        	"Stats: avg execution_time",
+        	"Stats: min percent_state_change",
+        	"Stats: max percent_state_change",
+        	"Stats: avg percent_state_change",
+        	"Stats: last_check >= ".$ts1min,
+        	"Stats: last_check >= ".$ts5min,
+        	"Stats: last_check >= ".$ts15min,
+        	"Stats: last_check >= ".$ts1hour,
+        	"Stats: last_check > 0",
+			"Filter: has_been_checked = 1",
+        	"Filter: check_type = 0"        	
+        );
+
+        // get passive services stats
+        $querypassiveservicestats = array(
+			"GET services",
+        	"Stats: min percent_state_change",
+        	"Stats: max percent_state_change",
+        	"Stats: avg percent_state_change",
+        	"Stats: last_check >= ".$ts1min,
+        	"Stats: last_check >= ".$ts5min,
+        	"Stats: last_check >= ".$ts15min,
+        	"Stats: last_check >= ".$ts1hour,
+        	"Stats: last_check > 0",
+			"Filter: has_been_checked = 1",
+        	"Filter: check_type = 1"        	
+        );        
+        
+        $queryactivehoststats = array(
+			"GET hosts",
+        	"Stats: min latency",
+        	"Stats: max latency",
+        	"Stats: avg latency",
+        	"Stats: min execution_time",
+        	"Stats: max execution_time",
+        	"Stats: avg execution_time",
+        	"Stats: min percent_state_change",
+        	"Stats: max percent_state_change",
+        	"Stats: avg percent_state_change",
+        	"Stats: last_check >= ".$ts1min,
+        	"Stats: last_check >= ".$ts5min,
+        	"Stats: last_check >= ".$ts15min,
+        	"Stats: last_check >= ".$ts1hour,
+        	"Stats: last_check > 0",
+			"Filter: has_been_checked = 1",
+        	"Filter: check_type = 0"        	
+        );
+
+        // get passive hosts stats
+        $querypassivehoststats = array(
+			"GET hosts",
+        	"Stats: min percent_state_change",
+        	"Stats: max percent_state_change",
+        	"Stats: avg percent_state_change",
+        	"Stats: last_check >= ".$ts1min,
+        	"Stats: last_check >= ".$ts5min,
+        	"Stats: last_check >= ".$ts15min,
+        	"Stats: last_check >= ".$ts1hour,
+        	"Stats: last_check > 0",
+			"Filter: has_been_checked = 1",
+        	"Filter: check_type = 1"        	
+        );                
+        
+        foreach(array_keys($this->sites) as $key){
+        	$site = $this->sites[$key];
+        	switch ($site["type"]){
+        		case "UNIX":
+        			$this->socketpath = $site["socket"];
+        			$this->host=null;
+        			$this->port=null;
+        			$this->getLivestatusVersion();
+        			break;
+        		case "TCP":
+        			$this->socketpath = null;
+        			$this->host=$site["host"];
+        			$this->port=$site["port"];
+        			$this->getLivestatusVersion();
+        			break;
+        		default:
+        			return false;
+        	}
+        	if($this->socket) { $this->resetConnection();}
+        	if($this->connect()){
+        		
+        		$this->execQuery($queryactiveservicestats );
+        		$activeservicesstats = json_decode($this->queryresponse);
+        		$activeservicesstats = $activeservicesstats[0];
+
+        		$this->execQuery($querypassiveservicestats );
+        		$passiveservicesstats = json_decode($this->queryresponse);
+        		$passiveservicesstats = $passiveservicesstats[0];
+        		
+        		$this->execQuery($queryactivehoststats );
+        		$activehostsstats = json_decode($this->queryresponse);
+        		$activehostsstats = $activehostsstats[0];
+
+        		$this->execQuery($querypassivehoststats );
+        		$passivehostsstats = json_decode($this->queryresponse);
+        		$passivehostsstats = $passivehostsstats[0];				
+        		
+				$performances[]=array(
+					"site"=>$key,
+					"services"=>array(
+						"active"=>array(
+							"execStats"=>array(
+								"lte1min"=>$activeservicesstats[9],
+								"lte5min"=>$activeservicesstats[10],
+								"lte15min"=>$activeservicesstats[11],
+								"lte1hour"=>$activeservicesstats[12],
+								"sinceStart"=>$activeservicesstats[13],
+								
+							),
+							"latency"=>array(
+								"min"=>$activeservicesstats[0],
+								"max"=>$activeservicesstats[1],
+								"average"=>$activeservicesstats[2]
+							),
+							"executiontime"=>array(
+								"min"=>$activeservicesstats[3],
+								"max"=>$activeservicesstats[4],
+								"average"=>$activeservicesstats[5]
+							),
+							"percentstatechange"=>array(
+								"min"=>$activeservicesstats[6],
+								"max"=>$activeservicesstats[7],
+								"average"=>$activeservicesstats[8]
+							)
+						),
+						"passive"=>array(
+							"execStats"=>array(
+								"lte1min"=>$passiveservicesstats[3],
+								"lte5min"=>$passiveservicesstats[4],
+								"lte15min"=>$passiveservicesstats[5],
+								"lte1hour"=>$passiveservicesstats[6],
+								"sinceStart"=>$passiveservicesstats[7]
+							),						
+							"percentstatechange"=>array(
+								"min"=>$passiveservicesstats[0],
+								"max"=>$passiveservicesstats[1],
+								"average"=>$passiveservicesstats[2]
+							)
+						)
+					),
+					"hosts"=>array(
+						"active"=>array(
+							"execStats"=>array(
+								"lte1min"=>$activehostsstats[9],
+								"lte5min"=>$activehostsstats[10],
+								"lte15min"=>$activehostsstats[11],
+								"lte1hour"=>$activehostsstats[12],
+								"sinceStart"=>$activehostsstats[13],
+								
+							),
+							"latency"=>array(
+								"min"=>$activehostsstats[0],
+								"max"=>$activehostsstats[1],
+								"average"=>$activehostsstats[2]
+							),
+							"executiontime"=>array(
+								"min"=>$activehostsstats[3],
+								"max"=>$activehostsstats[4],
+								"average"=>$activehostsstats[5]
+							),
+							"percentstatechange"=>array(
+								"min"=>$activehostsstats[6],
+								"max"=>$activehostsstats[7],
+								"average"=>$activehostsstats[8]
+							)
+						),
+						"passive"=>array(
+							"execStats"=>array(
+								"lte1min"=>$passivehostsstats[3],
+								"lte5min"=>$passivehostsstats[4],
+								"lte15min"=>$passivehostsstats[5],
+								"lte1hour"=>$passivehostsstats[6],
+								"sinceStart"=>$passivehostsstats[7]
+							),						
+							"percentstatechange"=>array(
+								"min"=>$passivehostsstats[0],
+								"max"=>$passivehostsstats[1],
+								"average"=>$passivehostsstats[2]
+							)
+						)
+					)
+				);
+				
+				
+        	}
+        }
+		return json_encode($performances);
     }
 
     public function getHealth($sites){

@@ -5,9 +5,10 @@
  */
 require_once("/var/www/frogx/conf/sites.inc.php");
 require_once("/var/www/frogx/api/live.php");
-require_once("/var/www/frogx/api/tac.php");
 
-$tac = new tac();
-print($tac->getOverallStates($config["sites"]));
-
+$tac = new live($config["sites"],1024);
+// get global states
+print_r(json_decode($tac->getOverallStates()));
+// get performances
+print_r(json_decode($tac->getPerformances()));
 ?>
